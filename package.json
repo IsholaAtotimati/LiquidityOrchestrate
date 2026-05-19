@@ -1,0 +1,43 @@
+{
+  "name": "idleliquidity-hook",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "fuzz": "forge test --fuzz-runs 1000",
+    "fuzz": "forge test --match-path test/IdleLiquidityHookEnterprise.fuzz.t.sol --fuzz-runs 5000 -vv",
+    "gas-report": "forge test --match-path test/IdleLiquidityHookEnterprise.gas.t.sol --report-gas"
+  },
+  "scripts": {
+    "typechain": "typechain --target ethers-v6 --out-dir frontend/types 'artifacts/**/*.json'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "This project has a minimal setup of Hardhat 3 Beta, without any plugins.",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@types/node": "^22.19.11",
+    "@uniswap/v4-core": "^1.0.2",
+    "chai": "^4.5.0",
+    "ethers": "^6.16.0",
+    "hardhat": "^2.28.6",
+    "hardhat-gas-reporter": "^2.3.0",
+    "solhint": "^6.2.1",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.8.0"
+  },
+  "dependencies": {
+    "@aave/core-v3": "^1.19.3",
+    "@chainlink/contracts": "^1.5.0",
+    "@openzeppelin/contracts": "^4.9.6",
+    "@rari-capital/solmate": "^6.4.0",
+    "@uniswap/v3-periphery": "^1.4.4",
+    "@uniswap/v4-periphery": "^1.0.3",
+    "dotenv": "^17.3.1",
+    "solmate": "^6.8.0"
+  },
+  "directories": {
+    "test": "tests"
+  }
+}
