@@ -8,7 +8,7 @@ contract StrategyManager {
 
     // map Strategy enum value -> implementation address
     mapping(uint8 => address) public implementations;
-    // executor contract address (contains execution logic; called via delegatecall)
+    // executor contract address (contains execution logic)
     address public executor;
 
     modifier onlyOwner() {

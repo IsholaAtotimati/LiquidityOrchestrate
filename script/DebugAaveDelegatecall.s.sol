@@ -27,21 +27,7 @@ contract DebugAaveDelegatecall is Script {
         console.log("aToken before", IERC20(aToken).balanceOf(address(this)));
 
         AaveStrategy aaveStrategy = new AaveStrategy();
-        bytes memory data = abi.encodeWithSelector(
-            AaveStrategy.deposit.selector,
-            IPool(aavePool),
-            IERC20(aToken),
-            IERC20(asset),
-            amount
-        );
-        (bool ok, bytes memory ret) = address(aaveStrategy).delegatecall(data);
-        console.log("delegatecall ok", ok);
-        if (ok) {
-            uint256 minted = abi.decode(ret, (uint256));
-            console.log("minted aToken", minted);
-        } else {
-            console.logBytes(ret);
-        }
+        console.log("strategy refactor in progress; delegatecall debug script is deprecated");
 
         console.log("asset after", IERC20(asset).balanceOf(address(this)));
         console.log("aToken after", IERC20(aToken).balanceOf(address(this)));

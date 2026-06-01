@@ -9,44 +9,49 @@ import {RebalanceEngine} from "../managers/RebalanceEngine.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-abstract contract IdleLiquidityRebalanceEngine is IdleLiquidityStorage, ReentrancyGuard, Ownable {
+abstract contract IdleLiquidityRebalanceEngine is ReentrancyGuard, Ownable {
     uint256 public constant MIN_GAS_LEFT = 120000;
     uint256 public constant REBALANCE_COOLDOWN_BLOCKS = 20;
 
     event ReenterReady(PoolId indexed pid, address indexed lp);
     event ExternalCallFailed(address indexed target, string reason, bytes data);
 
-    mapping(address => uint256) public failureCount;
+    // Derived hooks must provide the storage layout accessor so the concrete
+    // hook explicitly exposes the single named storage instance. This makes
+    // the storage ownership explicit to the implementing contract.
+    function _state() internal pure virtual returns (IdleLiquidityStorage.Layout storage);
 
     function _getCurrentTick(PoolId pid) internal view virtual returns (int24);
-    function _moveToIdle(PoolId pid, address lp) internal virtual;
-    function _moveToActive(PoolId pid, address lp) internal virtual;
+    function executeIdleRebalance(PoolId pid, address lp) internal virtual;
+    function executeActiveRebalance(PoolId pid, address lp) internal virtual;
 
     constructor(address owner_) Ownable(owner_) {}
 
     modifier cooldownPassed(PoolId pid) {
+        IdleLiquidityStorage.Layout storage s = _state();
         require(
-            lastRebalanceBlock[pid] == 0 || block.number > lastRebalanceBlock[pid] + REBALANCE_COOLDOWN_BLOCKS,
+            s.lastRebalanceBlock[pid] == 0 || block.number > s.lastRebalanceBlock[pid] + REBALANCE_COOLDOWN_BLOCKS,
             "COOLDOWN"
         );
         _;
     }
 
     function rebalance(PoolId pid, uint256 start, uint256 maxBatch) public nonReentrant cooldownPassed(pid) {
-        require(!emergencyPaused, "PAUSED");
-        require(_needUpdate[pid], "NO_UPDATE");
+        IdleLiquidityStorage.Layout storage s = _state();
+        require(!s.emergencyPaused, "PAUSED");
+        require(s._needUpdate[pid], "NO_UPDATE");
         require(maxBatch > 0 && maxBatch <= 50, "INVALID_BATCH");
         require(msg.sender == owner() || msg.sender == address(this), "NOT_AUTHORIZED");
 
         int24 tick = _getCurrentTick(pid);
 
         RebalanceEngine.rebalance(
-            poolConfig,
-            positions,
-            trackedLPs,
-            _needUpdate,
-            lastRebalanceBlock,
-            failureCount,
+            s.poolConfig,
+            s.positions,
+            s.trackedLPs,
+            s._needUpdate,
+            s.lastRebalanceBlock,
+            s.failureCount,
             pid,
             start,
             maxBatch,
@@ -56,14 +61,15 @@ abstract contract IdleLiquidityRebalanceEngine is IdleLiquidityStorage, Reentran
     }
 
     function _rebalanceSingleLP(PoolId pid, address lp, int24 tick) internal {
-        Position storage pos = positions[pid][lp];
+        IdleLiquidityStorage.Layout storage s = _state();
+        Position storage pos = s.positions[pid][lp];
         bool outOfRange = IdleLiquidityHelpers.isOutOfRange(tick, pos.lowerTick, pos.upperTick);
         if (outOfRange && pos.status == Status.ACTIVE) {
-            _moveToIdle(pid, lp);
-            positions[pid][lp].status = Status.IDLE;
+            executeIdleRebalance(pid, lp);
+            s.positions[pid][lp].status = Status.IDLE;
         } else if (!outOfRange && pos.status == Status.IDLE) {
-            _moveToActive(pid, lp);
-            positions[pid][lp].status = Status.ACTIVE;
+            executeActiveRebalance(pid, lp);
+            s.positions[pid][lp].status = Status.ACTIVE;
         }
     }
 
@@ -73,16 +79,17 @@ abstract contract IdleLiquidityRebalanceEngine is IdleLiquidityStorage, Reentran
     }
 
     function prepareReenterBatch(PoolId pid, uint256 start, uint256 maxBatch) external nonReentrant onlyOwner {
+        IdleLiquidityStorage.Layout storage s = _state();
         int24 tick = _getCurrentTick(pid);
         RebalanceEngine.prepareReenterBatch(
-            trackedLPs,
-            positions,
+            s.trackedLPs,
+            s.positions,
             pid,
             start,
             maxBatch,
             tick,
             address(this),
-            failureCount
+            s.failureCount
         );
-    }
+    }  
 }

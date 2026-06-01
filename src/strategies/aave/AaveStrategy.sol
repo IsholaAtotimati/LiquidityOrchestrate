@@ -12,34 +12,34 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 contract AaveStrategy {
     event AaveWithdrawDebug(address pool, address aToken, address asset, uint256 principal, uint256 allowance, uint256 balance);
 
-    // Designed to be used via delegatecall from the Hook so `address(this)` refers to the Hook
-    function depositToAave(IPool pool, IERC20 aToken, IERC20 asset, uint256 amount) internal returns (uint256) {
+    // Strategy implementation for Aave; external calls use an explicit hook address so `address(this)` is the strategy contract.
+    function depositToAave(address hook, IPool pool, IERC20 aToken, IERC20 asset, uint256 amount) internal returns (uint256) {
+        require(hook != address(0), "HOOK_NOT_SET");
         require(address(pool) != address(0), "AAVE_NOT_SET");
         require(address(aToken) != address(0), "ATOKEN_NOT_SET");
         _forceApprove(asset, address(pool), 0);
         _forceApprove(asset, address(pool), amount);
-        uint256 beforeBal = aToken.balanceOf(address(this));
-        try pool.supply(address(asset), amount, address(this), 0) {
+        uint256 beforeBal = aToken.balanceOf(hook);
+        try pool.supply(address(asset), amount, hook, 0) {
         } catch {
             revert("AAVE_SUPPLY_FAILED");
         }
-        uint256 afterBal = aToken.balanceOf(address(this));
+        uint256 afterBal = aToken.balanceOf(hook);
         require(afterBal > beforeBal, "AAVE_DEPOSIT_FAILED");
         return afterBal - beforeBal;
     }
 
-    function withdrawFromAave(IPool pool, IERC20 aToken, IERC20 asset, uint256 principal) internal returns (uint256) {
+    function withdrawFromAave(address hook, IPool pool, IERC20 aToken, IERC20 asset, uint256 principal) internal returns (uint256) {
         if (principal == 0) return 0;
-        uint256 allowance = aToken.allowance(address(this), address(pool));
-        uint256 balance = aToken.balanceOf(address(this));
-        emit AaveWithdrawDebug(address(pool), address(aToken), address(asset), principal, allowance, balance);
+        uint256 balance = aToken.balanceOf(hook);
+        emit AaveWithdrawDebug(address(pool), address(aToken), address(asset), principal, 0, balance);
         require(balance >= principal, "AAVE_ATOKEN_BALANCE_INSUFFICIENT");
         uint256 withdrawn = 0;
-        try pool.withdraw(address(asset), principal, address(this)) returns (uint256 w) {
+        try pool.withdraw(address(asset), principal, hook) returns (uint256 w) {
             withdrawn = w;
         } catch {
             (bool ok, bytes memory ret) = address(pool).call(
-                abi.encodeWithSignature("withdraw(address,uint256,address)", address(asset), principal, address(this))
+                abi.encodeWithSelector(IPool.withdraw.selector, address(asset), principal, hook)
             );
             if (ok && ret.length >= 32) {
                 withdrawn = abi.decode(ret, (uint256));
@@ -71,36 +71,38 @@ contract AaveStrategy {
     // requested function names. These call the existing implementations to
     // avoid duplicating logic and to ensure behavior remains unchanged.
     function _moveToAave(IPool pool, IERC20 aToken, IERC20 asset, uint256 amount) external returns (uint256) {
-        return depositToAave(pool, aToken, asset, amount);
+        return depositToAave(address(this), pool, aToken, asset, amount);
     }
 
     function _withdrawFromAave(IPool pool, IERC20 aToken, IERC20 asset, uint256 principal) external returns (uint256) {
-        return withdrawFromAave(pool, aToken, asset, principal);
+        return withdrawFromAave(address(this), pool, aToken, asset, principal);
     }
 
     function _aaveApproveAndSupply(IPool pool, IERC20 aToken, IERC20 asset, uint256 amount) external returns (uint256) {
-        return depositToAave(pool, aToken, asset, amount);
+        return depositToAave(address(this), pool, aToken, asset, amount);
     }
 
     // Generic facade for unified strategy interface
     // Unified context layout used by the Hook when calling strategies:
-    // (IPool aavePool, IERC20 aToken, IERC4626 vault, IERC20 asset, uint256 amountOrShares, bytes extra)
-    function deposit(bytes calldata ctx) external returns (uint256) {
+    // (IPool aavePool, IERC20 aToken, IERC4626 vault, IERC20 asset, uint256 amountOrShares)
+    function prepareDeposit(address hook, bytes calldata ctx) external pure returns (address target, bytes memory data) {
         (IPool pool, IERC20 aToken, IERC4626 vault, IERC20 asset, uint256 amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
-        return depositToAave(pool, aToken, asset, amountOrShares);
+        target = address(pool);
+        data = abi.encodeWithSelector(IPool.supply.selector, address(asset), amountOrShares, hook, 0);
     }
 
-    function withdraw(bytes calldata ctx) external returns (uint256) {
+    function prepareWithdraw(address hook, bytes calldata ctx) external pure returns (address target, bytes memory data) {
         (IPool pool, IERC20 aToken, IERC4626 vault, IERC20 asset, uint256 amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
-        return withdrawFromAave(pool, aToken, asset, amountOrShares);
+        target = address(pool);
+        data = abi.encodeWithSelector(IPool.withdraw.selector, address(asset), amountOrShares, hook);
     }
 
-    function balanceOf(bytes calldata ctx) external view returns (uint256) {
+    function balanceOf(address hook, bytes calldata ctx) external view returns (uint256) {
         (IPool _pool, IERC20 aToken, IERC4626 _vault, IERC20 _asset, uint256 _amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
-        return aToken.balanceOf(address(this));
+        return aToken.balanceOf(hook);
     }
 
-    function convertToAssets(bytes calldata ctx) external pure returns (uint256) {
+    function convertToAssets(address hook, bytes calldata ctx) external pure returns (uint256) {
         // Not applicable for Aave; return input amount as passthrough for compatibility.
         (IPool _pool, IERC20 _aToken, IERC4626 _vault, IERC20 _asset, uint256 amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
         return amountOrShares;

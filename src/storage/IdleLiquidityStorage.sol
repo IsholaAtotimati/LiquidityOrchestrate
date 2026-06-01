@@ -5,42 +5,67 @@ import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Position, PoolConfig} from "../types/IdleLiquidityTypes.sol";
 import {AggregatorV3Interface} from "../interfaces/AggregatorV3Interface.sol";
 
-contract IdleLiquidityStorage {
-    // --- CORE STATE ---
-    mapping(PoolId => PoolConfig) public poolConfig;
-    mapping(PoolId => mapping(address => Position)) public positions;
-    mapping(PoolId => address[]) public trackedLPs;
-    // fast lookup/indexing for tracked LPs to avoid O(n) existence checks and to enable
-    // efficient removal: mapping to index in trackedLPs array and presence flag
-    mapping(PoolId => mapping(address => uint256)) public trackedLPIndex;
-    mapping(PoolId => mapping(address => bool)) public trackedLPPresent;
+library IdleLiquidityStorage {
+    struct Layout {
+        // --- CORE STATE ---
+        mapping(PoolId => PoolConfig) poolConfig;
+        mapping(PoolId => mapping(address => Position)) positions;
+        mapping(PoolId => address[]) trackedLPs;
+        // fast lookup/indexing for tracked LPs to avoid O(n) existence checks and to enable
+        // efficient removal: mapping to index in trackedLPs array and presence flag
+        mapping(PoolId => mapping(address => uint256)) trackedLPIndex;
+        mapping(PoolId => mapping(address => bool)) trackedLPPresent;
 
-    // --- YIELD ---
-    mapping(PoolId => uint256[2]) public globalYieldIndex;
-    mapping(PoolId => uint256[2]) public totalIdleLiquidity;
-    mapping(PoolId => uint256) public lastYieldUpdate;
+        // --- YIELD ---
+        mapping(PoolId => uint256[2]) globalYieldIndex;
+        mapping(PoolId => uint256[2]) totalIdleLiquidity;
+        mapping(PoolId => uint256) lastYieldUpdate;
 
-    // --- STRATEGY ACCOUNTING ---
-    mapping(PoolId => uint256[2]) public totalATokenPrincipal;
-    mapping(PoolId => uint256[2]) public totalVaultShares;
+        // --- STRATEGY ACCOUNTING ---
+        mapping(PoolId => uint256[2]) totalATokenPrincipal;
+        mapping(PoolId => uint256[2]) totalVaultShares;
 
-    // --- ORACLE ---
-    mapping(address => AggregatorV3Interface) public priceFeed;
-    mapping(address => int256) public lastGoodPrice;
+        // --- ORACLE ---
+        mapping(address => AggregatorV3Interface) priceFeed;
+        mapping(address => int256) lastGoodPrice;
 
-    uint256 public constant ORACLE_MAX_DELAY = 1 hours;
-    uint256 public constant MAX_DEVIATION_BP = 500; // 5%
+        // --- REBALANCE CONTROL ---
+        mapping(PoolId => bool) _needUpdate;
+        mapping(PoolId => uint256) lastRebalanceBlock;
+        // track last update-request block to debounce _needUpdate triggers
+        mapping(PoolId => uint256) lastUpdateRequestBlock;
+        mapping(PoolId => int24) lastObservedTick;
+        mapping(PoolId => bool) hasObservedTick;
+        uint256 rebalanceCooldownBlocks;
+        int24 rebalanceTickThreshold;
+        mapping(address => uint256) failureCount;
 
-    // --- REBALANCE CONTROL ---
-    mapping(PoolId => bool) internal _needUpdate;
-    mapping(PoolId => uint256) public lastRebalanceBlock;
-    // track last update-request block to debounce _needUpdate triggers
-    mapping(PoolId => uint256) public lastUpdateRequestBlock;
+        uint256 rebalanceRewardETH;
 
-    uint256 public constant MIN_UPDATE_INTERVAL_BLOCKS = 3;
+        // --- ADMIN / CONFIG ---
+        bool debugEmitUpdateRequested;
+        uint256 maxLPsPerPool;
+        mapping(address => bool) trustedAavePools;
+        mapping(address => bool) trustedERC4626Vaults;
+        address aaveStrategy;
+        address erc4626Strategy;
+        address strategyManager;
 
-    uint256 public rebalanceRewardETH;
+        PoolId[] allPools;
+        mapping(PoolId => bool) poolExists;
+        mapping(PoolId => bool) approvedPools;
+        uint256 poolCursor;
 
-    // --- SAFETY ---
-    bool public emergencyPaused;
+        // --- SAFETY ---
+        bool emergencyPaused;
+    }
+
+    bytes32 internal constant STORAGE_SLOT = keccak256("idle.liquidity.storage");
+
+    function layout() internal pure returns (Layout storage l) {
+        bytes32 slot = STORAGE_SLOT;
+        assembly {
+            l.slot := slot
+        }
+    }
 }

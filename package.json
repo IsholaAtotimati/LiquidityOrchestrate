@@ -4,12 +4,14 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "fuzz": "forge test --fuzz-runs 1000",
     "fuzz": "forge test --match-path test/IdleLiquidityHookEnterprise.fuzz.t.sol --fuzz-runs 5000 -vv",
-    "gas-report": "forge test --match-path test/IdleLiquidityHookEnterprise.gas.t.sol --report-gas"
-  },
-  "scripts": {
-    "typechain": "typechain --target ethers-v6 --out-dir frontend/types 'artifacts/**/*.json'"
+    "gas-report": "forge test --match-path test/IdleLiquidityHookEnterprise.gas.t.sol --report-gas",
+    "typechain": "typechain --target ethers-v6 --out-dir frontend/types 'artifacts/**/*.json'",
+    "generate:defaults": "node scripts/generate-defaults.js",
+    "init:pool": "node scripts/initializePool.js",
+    "add-liquidity": "node add-test-liquidity.js",
+    "check-pool": "node check-pool-status.js",
+    "approve-pool": "node approve-pool.js"
   },
   "keywords": [],
   "author": "",

@@ -52,7 +52,7 @@ library YieldManager {
         bytes memory baseCtx = abi.encode(ac.aavePool, ac.aToken, ac.vault, IERC20(ac.asset), uint256(0));
 
         if (address(ac.aToken) != address(0)) {
-            (bool okBal, bytes memory retBal) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.balanceOf.selector, baseCtx));
+            (bool okBal, bytes memory retBal) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.balanceOf.selector, address(this), baseCtx));
             if (okBal) {
                 uint256 current = abi.decode(retBal, (uint256));
                 uint256 principal = totalATokenPrincipal[pid][side];
@@ -61,7 +61,7 @@ library YieldManager {
                 }
             }
         } else if (address(ac.vault) != address(0)) {
-            (bool okShares, bytes memory retShares) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.balanceOf.selector, baseCtx));
+            (bool okShares, bytes memory retShares) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.balanceOf.selector, address(this), baseCtx));
             if (okShares) {
                 uint256 shares = abi.decode(retShares, (uint256));
                 uint256 principalShares = totalVaultShares[pid][side];
@@ -70,9 +70,9 @@ library YieldManager {
                     bytes memory ctxPri = abi.encode(ac.aavePool, ac.aToken, ac.vault, IERC20(ac.asset), principalShares);
                     uint256 assetsNow = 0;
                     uint256 assetsPrincipal = 0;
-                    (bool okNow, bytes memory retNow) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.convertToAssets.selector, ctxNow));
+                    (bool okNow, bytes memory retNow) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.convertToAssets.selector, address(this), ctxNow));
                     if (okNow) assetsNow = abi.decode(retNow, (uint256));
-                    (bool okPri, bytes memory retPri) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.convertToAssets.selector, ctxPri));
+                    (bool okPri, bytes memory retPri) = impl.staticcall(abi.encodeWithSelector(IStrategyCommon.convertToAssets.selector, address(this), ctxPri));
                     if (okPri) assetsPrincipal = abi.decode(retPri, (uint256));
                     if (assetsNow > assetsPrincipal) {
                         yieldAmount = assetsNow - assetsPrincipal;

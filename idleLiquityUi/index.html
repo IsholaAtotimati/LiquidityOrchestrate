@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>YieldPilot Demo Dashboard</title>
+
+<link rel="stylesheet" href="style.css" />
+
+<!-- Charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Ethers.js -->
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.10.0/dist/ethers.umd.min.js"></script>
+
+</head>
+<body>
+
+<header>🚀 YieldPilot — Liquidity Orchestration Dashboard</header>
+
+<!-- ===================== -->
+<!-- 🔗 TOP BAR -->
+<!-- ===================== -->
+<div class="top-bar">
+    <div>
+        <button onclick="connectWallet()">Connect Wallet</button>
+        <p id="wallet">Not connected</p>
+    </div>
+
+    <div>
+        <button class="secondary" onclick="runRebalance()">Run Rebalance</button>
+    </div>
+</div>
+
+<!-- ===================== -->
+<!-- 📊 MAIN DASHBOARD -->
+<!-- ===================== -->
+<div class="container">
+
+    <!-- ===================== -->
+    <!-- 💰 CAPITAL OVERVIEW -->
+    <!-- ===================== -->
+    <div class="card">
+        <h3>Capital Overview</h3>
+
+        <p>Total: <span id="total">$0</span></p>
+        <p class="green">Active: <span id="active">$0</span></p>
+        <p class="yellow">Idle: <span id="idle">$0</span></p>
+
+        <hr/>
+
+        <p>LP Count: <span id="lpCount">0</span></p>
+
+        <p>Your Liquidity0: <span id="liq0">0</span></p>
+        <p>Your Liquidity1: <span id="liq1">0</span></p>
+
+        <p>Your Yield0: <span id="yield0">0</span></p>
+        <p>Your Yield1: <span id="yield1">0</span></p>
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- 📊 YIELD COMPARISON -->
+    <!-- ===================== -->
+    <div class="card">
+        <h3>Yield Comparison</h3>
+        <canvas id="yieldChart"></canvas>
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- 🔄 FLOW ENGINE -->
+    <!-- ===================== -->
+    <div class="card">
+        <h3>Liquidity Flow Engine</h3>
+        <p id="flowState">Waiting for swap event...</p>
+        <button onclick="triggerSwap()">Trigger Swap</button>
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- 📈 ROI SIMULATOR -->
+    <!-- ===================== -->
+    <div class="card">
+        <h3>ROI Simulator</h3>
+        <p>Adjust LP capital:</p>
+        <input type="range" min="10000" max="200000" value="120000" id="roiSlider" />
+        <p id="roiOutput">Estimated Yield: 9.8%</p>
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- 📈 TVL CHART -->
+    <!-- ===================== -->
+    <div class="card">
+        <h3>TVL Growth</h3>
+        <canvas id="tvlChart"></canvas>
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- 🥧 ALLOCATION -->
+    <!-- ===================== -->
+    <div class="card">
+        <h3>Strategy Allocation</h3>
+        <canvas id="allocationChart"></canvas>
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- 📊 YIELD TREND -->
+    <!-- ===================== -->
+    <div class="card">
+        <h3>Yield Accumulation</h3>
+        <canvas id="yieldTrendChart"></canvas>
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- 📡 EVENT LOG -->
+    <!-- ===================== -->
+    <div class="card log">
+        <h3>Live Event Feed</h3>
+        <div id="log"></div>
+    </div>
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>

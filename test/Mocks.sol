@@ -52,14 +52,15 @@ contract MockAavePool {
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
-        // mint aToken to onBehalfOf
+        // transfer underlying from msg.sender into the pool, then mint aTokens
+        require(assetToken.transferFrom(msg.sender, address(this), amount), "TRANSFER_FAILED");
         aTokenContract.mint(onBehalfOf, amount);
-        // burn underlying from msg.sender if needed (we rely on approvals in tests)
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
-        // mint underlying back to `to` to simulate withdrawal
-        assetToken.mint(to, amount);
+        // burn aTokens from msg.sender and return underlying from the pool to `to`
+        require(aTokenContract.transferFrom(msg.sender, address(this), amount), "TRANSFER_FAILED");
+        require(assetToken.transfer(to, amount), "TRANSFER_FAILED");
         return amount;
     }
 
@@ -124,6 +125,10 @@ contract MockPoolManager {
     function callRegister(address hook, PoolId pid, address lp, uint128 l0, uint128 l1, int24 lower, int24 upper) external {
         (bool ok, ) = hook.call(abi.encodeWithSignature("registerPosition(bytes32,address,uint128,uint128,int24,int24)", PoolId.unwrap(pid), lp, l0, l1, lower, upper));
         require(ok, "register failed");
+    }
+
+    function extsload(bytes32) external pure returns (bytes32) {
+        return bytes32(0);
     }
 }
 

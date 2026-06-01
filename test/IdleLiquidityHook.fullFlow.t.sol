@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {IdleLiquidityHookEnterprise} from "../src/hooks/IdleLiquidityHookEnterprise.sol";
+import {TestableIdleLiquidityHookEnterprise} from "./TestableIdleLiquidityHookEnterprise.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolIdLibrary, PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
@@ -12,7 +13,7 @@ import {Status} from "../src/types/IdleLiquidityTypes.sol";
 import {ERC20PresetMinterPauser} from "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {AggregatorV3Interface} from "../src/interfaces/AggregatorV3Interface.sol";
-import {MockAavePool} from "../contracts/MockAavePool.sol";
+import {MockAavePool} from "./Mocks.sol";
 import {StrategyManager} from "../src/managers/StrategyManager.sol";
 import {StrategyExecutor} from "../src/strategies/StrategyExecutor.sol";
 import {AaveStrategy} from "../src/strategies/aave/AaveStrategy.sol";
@@ -85,14 +86,14 @@ contract MockPoolManager {
 }
 
 contract IdleLiquidityHookFullFlowTest is Test {
-    IdleLiquidityHookEnterprise public hook;
+    TestableIdleLiquidityHookEnterprise public hook;
     MockPoolManager public pm;
     ERC20PresetMinterPauser public t0;
     ERC20PresetMinterPauser public t1;
 
     function setUp() public {
         pm = new MockPoolManager();
-        hook = new IdleLiquidityHookEnterprise(address(pm));
+        hook = new TestableIdleLiquidityHookEnterprise(address(pm));
 
         t0 = new ERC20PresetMinterPauser("T0", "T0");
         t1 = new ERC20PresetMinterPauser("T1", "T1");
@@ -188,7 +189,7 @@ contract IdleLiquidityHookFullFlowTest is Test {
     function test_out_of_range_deposits_and_withdraws_to_aave() public {
         ERC20PresetMinterPauser asset = new ERC20PresetMinterPauser("A", "A");
         ERC20PresetMinterPauser aToken = new ERC20PresetMinterPauser("aA", "aA");
-        MockAavePool aavePool = new MockAavePool(address(aToken));
+        MockAavePool aavePool = new MockAavePool(address(aToken), address(asset));
         MockChainlinkFeed feed = new MockChainlinkFeed(1e18);
 
         uint256 amount = 1 ether;
@@ -297,7 +298,7 @@ contract IdleLiquidityHookFullFlowTest is Test {
         function test_debug_mock_aave_pool_withdraw_sanity() public {
         ERC20PresetMinterPauser asset = new ERC20PresetMinterPauser("A", "A");
         ERC20PresetMinterPauser aToken = new ERC20PresetMinterPauser("aA", "aA");
-        MockAavePool aavePool = new MockAavePool(address(aToken));
+        MockAavePool aavePool = new MockAavePool(address(aToken), address(asset));
         uint256 amount = 1 ether;
 
         asset.mint(address(this), amount);
@@ -321,10 +322,146 @@ contract IdleLiquidityHookFullFlowTest is Test {
         assertEq(asset.balanceOf(address(this)), amount, "expected asset returned to test account");
     }
 
+    function test_idle_to_aave_harvest_and_accrueYield() public {
+        ERC20PresetMinterPauser asset = new ERC20PresetMinterPauser("Asset", "AST");
+        ERC20PresetMinterPauser aToken = new ERC20PresetMinterPauser("aAsset", "aAST");
+        MockAavePool aavePool = new MockAavePool(address(aToken), address(asset));
+        MockChainlinkFeed feed = new MockChainlinkFeed(1e18);
+
+        StrategyManager strategyManager = new StrategyManager(address(this));
+        StrategyExecutor strategyExecutor = new StrategyExecutor();
+        AaveStrategy aaveStrategy = new AaveStrategy();
+
+        strategyManager.setExecutor(address(strategyExecutor));
+        hook.setStrategyManager(address(strategyManager));
+        hook.setAaveStrategy(address(aaveStrategy));
+        hook.setTrustedAavePool(address(aavePool), true);
+        hook.setPriceFeed(address(asset), address(feed));
+
+        Currency cAsset = Currency.wrap(address(asset));
+        Currency cT1 = Currency.wrap(address(t1));
+        Currency c0 = cAsset < cT1 ? cAsset : cT1;
+        Currency c1 = cAsset < cT1 ? cT1 : cAsset;
+        IHooks hooksIface = IHooks(address(hook));
+        PoolKey memory key = PoolKey({currency0: c0, currency1: c1, fee: 3000, tickSpacing: 60, hooks: hooksIface});
+        PoolId pid = PoolIdLibrary.toId(key);
+
+        hook.setPoolConfigAave(pid, 0, address(asset), address(aavePool), address(aToken), 0, 0);
+        hook.setApprovedPool(pid, true);
+
+        uint256 amount = 100 ether;
+        asset.mint(address(this), amount);
+        asset.transfer(address(hook), amount);
+
+        hook.registerPosition(pid, address(this), uint128(amount), 0, -120, 120);
+        assertEq(asset.balanceOf(address(hook)), amount, "hook should hold underlying before idle move");
+
+        IPoolManager.SwapParams memory sp = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: int256(1e18 / 100),
+            sqrtPriceLimitX96: 0
+        });
+
+        pm.swap(key, sp, "");
+        pm.swap(key, sp, "");
+        pm.swap(key, sp, "");
+
+        (bool upkeepNeeded,) = hook.checkUpkeep("");
+        assertTrue(upkeepNeeded, "rebalance should be needed after price movement");
+
+        hook.rebalance(pid, 0, 10);
+
+        (
+            uint128 liq0,
+            uint128 liq1,
+            int24 lower,
+            int24 upper,
+            Status statusAfterIdle,
+            uint256 lastYieldIndex0AfterIdle,
+            uint256 lastYieldIndex1AfterIdle,
+            uint256 accumulatedYield0AfterIdle,
+            uint256 accumulatedYield1AfterIdle,
+            uint256 vaultShares0AfterIdle,
+            uint256 vaultShares1AfterIdle,
+            uint256 aTokenPrincipal0AfterIdle,
+            uint256 aTokenPrincipal1AfterIdle
+        ) = hook.positions(pid, address(this));
+        emit log_named_int("currentTick", int256(pm.currentTick()));
+        emit log_named_int("lower", lower);
+        emit log_named_int("upper", upper);
+        emit log_named_string("statusAfterIdle", statusAfterIdle == Status.ACTIVE ? "ACTIVE" : statusAfterIdle == Status.IDLE ? "IDLE" : "OTHER");
+        emit log_named_uint("liq0", liq0);
+        emit log_named_uint("aTokenPrincipal0AfterIdle", aTokenPrincipal0AfterIdle);
+
+        assertTrue(statusAfterIdle == Status.IDLE, "position should move to idle after out-of-range rebalance");
+        assertEq(liq0, 0, "idle rebalance should clear liquidity");
+        assertEq(aTokenPrincipal0AfterIdle, amount, "aToken principal should track the deposited amount");
+        assertEq(asset.balanceOf(address(hook)), 0, "underlying should be deployed to Aave");
+        assertEq(aToken.balanceOf(address(hook)), amount, "hook should hold aTokens after deployment");
+
+        hook.clearPosition(pid, address(this));
+        hook.registerPosition(pid, address(this), uint128(amount), 0, -120, 120);
+        hook.setPositionATokenPrincipalForTest(pid, address(this), 0, amount);
+        hook.setAccountingForTest(pid, 0, amount, 0, amount);
+
+        (
+            uint128 activeLiq0,
+            uint128 activeLiq1,
+            int24 activeLower,
+            int24 activeUpper,
+            Status activeStatus,
+            uint256 activeLastYieldIndex0,
+            uint256 activeLastYieldIndex1,
+            uint256 accumulatedYield0BeforeHarvest,
+            uint256 accumulatedYield1BeforeHarvest,
+            uint256 activeVaultShares0,
+            uint256 activeVaultShares1,
+            uint256 activeATokenPrincipal0,
+            uint256 activeATokenPrincipal1
+        ) = hook.positions(pid, address(this));
+
+        assertTrue(activeStatus == Status.ACTIVE, "LP should be active after re-registering");
+        assertEq(activeLiq0, uint128(amount), "re-registered LP should carry liquidity");
+        assertEq(activeATokenPrincipal0, amount, "principal should remain tracked after re-register");
+
+        uint256 interest = 5 ether;
+        aToken.mint(address(hook), interest);
+        assertEq(aToken.balanceOf(address(hook)), amount + interest, "interest growth should increase aToken balance");
+
+        uint256 beforeHarvestIndex = hook.globalYieldIndex(pid, 0);
+        uint256 harvested = hook.harvest(pid, 0);
+        uint256 afterHarvestIndex = hook.globalYieldIndex(pid, 0);
+
+        assertEq(harvested, interest, "harvest should report the earned interest");
+        assertGt(afterHarvestIndex, beforeHarvestIndex, "global yield index should advance after harvest");
+
+        hook.accrueYield(pid, address(this));
+
+        (
+            uint128 postAccruedLiq0,
+            uint128 postAccruedLiq1,
+            int24 postAccruedLower,
+            int24 postAccruedUpper,
+            Status postAccruedStatus,
+            uint256 postAccruedLastYieldIndex0,
+            uint256 postAccruedLastYieldIndex1,
+            uint256 accumulatedYield0AfterHarvest,
+            uint256 accumulatedYield1AfterHarvest,
+            uint256 postAccruedVaultShares0,
+            uint256 postAccruedVaultShares1,
+            uint256 postAccruedATokenPrincipal0,
+            uint256 postAccruedATokenPrincipal1
+        ) = hook.positions(pid, address(this));
+
+        assertTrue(postAccruedStatus == Status.ACTIVE, "LP should stay active after accrual");
+        assertGt(accumulatedYield0AfterHarvest, accumulatedYield0BeforeHarvest, "LP accrued yield should increase");
+        assertEq(postAccruedATokenPrincipal0, amount, "aToken principal should remain unchanged while tracking yield");
+    }
+
     function test_debug_mock_aave_pool_transferFrom_sanity() public {
         ERC20PresetMinterPauser asset = new ERC20PresetMinterPauser("A", "A");
         ERC20PresetMinterPauser aToken = new ERC20PresetMinterPauser("aA", "aA");
-        MockAavePool aavePool = new MockAavePool(address(aToken));
+        MockAavePool aavePool = new MockAavePool(address(aToken), address(asset));
         uint256 amount = 1 ether;
 
         asset.mint(address(this), amount);

@@ -1,0 +1,164 @@
+body {
+    margin: 0;
+    font-family: "Inter", Arial, sans-serif;
+    background: radial-gradient(circle at top, #0b0f1a, #070a12);
+    color: #e6eaf2;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ===================== */
+/* HEADER */
+/* ===================== */
+header {
+    padding: 22px;
+    text-align: center;
+    background: rgba(17, 24, 42, 0.7);
+    font-size: 22px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(10px);
+    letter-spacing: 0.5px;
+}
+
+/* ===================== */
+/* TOP BAR */
+/* ===================== */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 22px;
+    background: rgba(15, 22, 38, 0.6);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(10px);
+}
+
+/* Wallet */
+#wallet {
+    font-size: 12px;
+    color: #9aa4b2;
+    margin-top: 6px;
+    word-break: break-all;
+}
+
+/* ===================== */
+/* GRID LAYOUT */
+/* ===================== */
+.container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+    padding: 22px;
+}
+
+/* ===================== */
+/* CARD (GLASS EFFECT) */
+/* ===================== */
+.card {
+    background: rgba(20, 28, 47, 0.75);
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    backdrop-filter: blur(12px);
+    transition: 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0,255,157,0.25);
+}
+
+/* ===================== */
+/* COLORS */
+/* ===================== */
+.green { color: #00ff9d; }
+.yellow { color: #ffcc00; }
+
+/* ===================== */
+/* BUTTONS */
+/* ===================== */
+button {
+    padding: 10px 14px;
+    margin-top: 10px;
+    background: linear-gradient(135deg, #00ff9d, #00cfff);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #000;
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 14px rgba(0,255,157,0.4);
+}
+
+/* Secondary button */
+button.secondary {
+    background: rgba(31, 42, 68, 0.9);
+    color: white;
+    border: 1px solid rgba(47, 59, 92, 0.8);
+}
+
+button.secondary:hover {
+    background: #2a3655;
+    box-shadow: 0 0 12px rgba(100,120,255,0.25);
+}
+
+/* ===================== */
+/* LOG PANEL */
+/* ===================== */
+.log {
+    height: 220px;
+    overflow-y: auto;
+    font-size: 12px;
+    background: rgba(15, 22, 38, 0.6);
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Scrollbar (nice touch) */
+.log::-webkit-scrollbar {
+    width: 6px;
+}
+
+.log::-webkit-scrollbar-thumb {
+    background: rgba(0,255,157,0.3);
+    border-radius: 10px;
+}
+
+/* ===================== */
+/* TEXT */
+/* ===================== */
+#flowState {
+    font-size: 13px;
+    color: #9aa4b2;
+}
+
+/* ===================== */
+/* SLIDER */
+/* ===================== */
+input[type="range"] {
+    width: 100%;
+    margin-top: 10px;
+    accent-color: #00ff9d;
+}
+
+/* ===================== */
+/* CHART SPACING */
+/* ===================== */
+canvas {
+    margin-top: 10px;
+}
+
+/* ===================== */
+/* SMALL RESPONSIVENESS */
+/* ===================== */
+@media (max-width: 900px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+}

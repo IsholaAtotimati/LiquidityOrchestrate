@@ -10,9 +10,8 @@ import {IStrategyCommon} from "./interfaces/IStrategy.sol";
 import {Address} from "../../lib/v4-core/lib/openzeppelin-contracts/contracts/utils/Address.sol";
 
 contract StrategyExecutor {
-    // Primary entrypoints. These functions are intended to be called via
-    // `delegatecall` from the Hook so that `address(this)` and storage
-    // references refer to the Hook contract.
+    // Primary entrypoints. These functions are intended to be called directly
+    // by the RebalanceEngine through the executor contract.
 
     function resolveImplementation(
         address strategyManager,
@@ -43,7 +42,8 @@ contract StrategyExecutor {
         return address(0);
     }
 
-    function executeDeposit(
+    function prepareDeposit(
+        address hook,
         address strategyManager,
         address aavePool,
         address aToken,
@@ -55,12 +55,12 @@ contract StrategyExecutor {
         bool trustedAavePool,
         bool trustedERC4626Vault,
         uint256 amount
-    ) external returns (bool, uint256) {
+    ) external view returns (bool, address, bytes memory) {
         if (aavePool != address(0) && !trustedAavePool) {
-            return (false, 0);
+            return (false, address(0), bytes(""));
         }
         if (vault != address(0) && !trustedERC4626Vault) {
-            return (false, 0);
+            return (false, address(0), bytes(""));
         }
 
         address impl = resolveImplementation(strategyManager, strategyImpl, aavePool, vault, aaveStrategy, erc4626Strategy);
@@ -72,42 +72,16 @@ contract StrategyExecutor {
                 IERC20(asset),
                 amount
             );
-            bytes memory ret = Address.functionDelegateCall(impl, abi.encodeWithSelector(IStrategyCommon.deposit.selector, ctx));
-            return (true, abi.decode(ret, (uint256)));
+            bytes memory ret = Address.functionStaticCall(impl, abi.encodeWithSelector(IStrategyCommon.prepareDeposit.selector, hook, ctx));
+            (address target, bytes memory data) = abi.decode(ret, (address, bytes));
+            return (true, target, data);
         }
 
-        if (aavePool != address(0)) {
-            IERC20(asset).approve(aavePool, amount);
-            uint256 beforeBal = IERC20(aToken).balanceOf(address(this));
-            try IPool(aavePool).supply(asset, amount, address(this), 0) {
-            } catch {
-                return (false, 0);
-            }
-            uint256 afterBal = IERC20(aToken).balanceOf(address(this));
-            if (afterBal <= beforeBal) {
-                return (false, 0);
-            }
-            return (true, afterBal - beforeBal);
-        }
-
-        if (vault != address(0)) {
-            IERC20(asset).approve(vault, amount);
-            uint256 beforeBal = IERC4626(vault).balanceOf(address(this));
-            try IERC4626(vault).deposit(amount, address(this)) returns (uint256) {
-            } catch {
-                return (false, 0);
-            }
-            uint256 afterBal = IERC4626(vault).balanceOf(address(this));
-            if (afterBal <= beforeBal) {
-                return (false, 0);
-            }
-            return (true, afterBal - beforeBal);
-        }
-
-        return (false, 0);
+        return (false, address(0), bytes(""));
     }
 
-    function executeWithdraw(
+    function prepareWithdraw(
+        address hook,
         address strategyManager,
         address aavePool,
         address aToken,
@@ -119,12 +93,12 @@ contract StrategyExecutor {
         bool trustedAavePool,
         bool trustedERC4626Vault,
         uint256 amountOrShares
-    ) external returns (bool, uint256) {
+    ) external view returns (bool, address, bytes memory) {
         if (aavePool != address(0) && !trustedAavePool) {
-            return (false, 0);
+            return (false, address(0), bytes(""));
         }
         if (vault != address(0) && !trustedERC4626Vault) {
-            return (false, 0);
+            return (false, address(0), bytes(""));
         }
 
         address impl = resolveImplementation(strategyManager, strategyImpl, aavePool, vault, aaveStrategy, erc4626Strategy);
@@ -136,31 +110,11 @@ contract StrategyExecutor {
                 IERC20(asset),
                 amountOrShares
             );
-            (bool ok, bytes memory ret) = impl.delegatecall(
-                abi.encodeWithSelector(IStrategyCommon.withdraw.selector, ctx)
-            );
-            if (!ok) {
-                return (false, 0);
-            }
-            return (true, abi.decode(ret, (uint256)));
+            bytes memory ret = Address.functionStaticCall(impl, abi.encodeWithSelector(IStrategyCommon.prepareWithdraw.selector, hook, ctx));
+            (address target, bytes memory data) = abi.decode(ret, (address, bytes));
+            return (true, target, data);
         }
 
-        if (aavePool != address(0)) {
-            try IPool(aavePool).withdraw(asset, amountOrShares, address(this)) returns (uint256 w) {
-                return (true, w);
-            } catch {
-                return (false, 0);
-            }
-        }
-
-        if (vault != address(0)) {
-            try IERC4626(vault).redeem(amountOrShares, address(this), address(this)) {
-                return (true, 0);
-            } catch {
-                return (false, 0);
-            }
-        }
-
-        return (false, 0);
+        return (false, address(0), bytes(""));
     }
 }

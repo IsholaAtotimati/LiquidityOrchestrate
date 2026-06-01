@@ -7,7 +7,7 @@ import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 // note: use internal low-level approve helper instead of relying on external `forceApprove` helper
 
 contract ERC4626Strategy {
-    // Designed to be used via delegatecall from the Hook so `address(this)` refers to the Hook
+    // Strategy implementation for ERC4626 vaults; external calls use an explicit hook address so `address(this)` is the strategy contract.
     function depositToVault(IERC4626 vault, IERC20 asset, uint256 amount) internal returns (uint256) {
         require(address(vault) != address(0), "VAULT_NOT_SET");
         _forceApprove(asset, address(vault), 0);
@@ -40,23 +40,24 @@ contract ERC4626Strategy {
     // Generic facade for unified strategy interface
     // Unified context layout used by the Hook:
     // (IPool aavePool, IERC20 aToken, IERC4626 vault, IERC20 asset, uint256 amountOrShares, bytes extra)
-    function deposit(bytes calldata ctx) external returns (uint256) {
+    function prepareDeposit(address hook, bytes calldata ctx) external pure returns (address target, bytes memory data) {
         (IPool _pool, IERC20 _aToken, IERC4626 vault, IERC20 asset, uint256 amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
-        return depositToVault(vault, asset, amountOrShares);
+        target = address(vault);
+        data = abi.encodeWithSelector(IERC4626.deposit.selector, amountOrShares, hook);
     }
 
-    function withdraw(bytes calldata ctx) external returns (uint256) {
+    function prepareWithdraw(address hook, bytes calldata ctx) external pure returns (address target, bytes memory data) {
         (IPool _pool, IERC20 _aToken, IERC4626 vault, IERC20 _asset, uint256 amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
-        redeemFromVault(vault, amountOrShares);
-        return 0;
+        target = address(vault);
+        data = abi.encodeWithSelector(IERC4626.redeem.selector, amountOrShares, hook, hook);
     }
 
-    function balanceOf(bytes calldata ctx) external view returns (uint256) {
+    function balanceOf(address hook, bytes calldata ctx) external view returns (uint256) {
         (IPool _pool, IERC20 _aToken, IERC4626 vault, IERC20 _asset, uint256 _amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
-        return vault.balanceOf(address(this));
+        return vault.balanceOf(hook);
     }
 
-    function convertToAssets(bytes calldata ctx) external view returns (uint256) {
+    function convertToAssets(address hook, bytes calldata ctx) external view returns (uint256) {
         (IPool _pool, IERC20 _aToken, IERC4626 vault, IERC20 _asset, uint256 amountOrShares) = abi.decode(ctx, (IPool, IERC20, IERC4626, IERC20, uint256));
         return vault.convertToAssets(amountOrShares);
     }

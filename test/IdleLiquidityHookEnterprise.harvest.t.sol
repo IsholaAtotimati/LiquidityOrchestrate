@@ -3,17 +3,18 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {IdleLiquidityHookEnterprise} from "../src/hooks/IdleLiquidityHookEnterprise.sol";
+import {TestableIdleLiquidityHookEnterprise} from "./TestableIdleLiquidityHookEnterprise.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {ERC20PresetMinterPauser} from "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
 contract MockHarvestStrategy {
-    function balanceOf(bytes calldata) external pure returns (uint256) {
+    function balanceOf(address, bytes calldata) external pure returns (uint256) {
         return 100 ether;
     }
 
-    function convertToAssets(bytes calldata ctx) external pure returns (uint256) {
+    function convertToAssets(address, bytes calldata ctx) external pure returns (uint256) {
         (,,, , uint256 amountOrShares) = abi.decode(ctx, (address, address, address, address, uint256));
         return amountOrShares;
     }
@@ -27,13 +28,13 @@ contract MockPoolManagerForHarvest {
 }
 
 contract HarvestTest is Test {
-    IdleLiquidityHookEnterprise hook;
+    TestableIdleLiquidityHookEnterprise hook;
     MockHarvestStrategy aaveStrategy;
     address owner;
 
     function setUp() public {
         MockPoolManagerForHarvest m = new MockPoolManagerForHarvest();
-        hook = new IdleLiquidityHookEnterprise(address(m));
+        hook = new TestableIdleLiquidityHookEnterprise(address(m));
         aaveStrategy = new MockHarvestStrategy();
         hook.setAaveStrategy(address(aaveStrategy));
         owner = address(this);

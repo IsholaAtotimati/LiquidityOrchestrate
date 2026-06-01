@@ -147,13 +147,7 @@ contract DemoTokenMovementScript is Script {
                 aaveAmount
             );
 
-            try aaveStrategy.deposit(ctx) returns (uint256 result) {
-                console.log("Strategy deposit succeeded, got", result, "aTokens");
-            } catch Error(string memory reason) {
-                console.log("Strategy deposit failed:", reason);
-            } catch (bytes memory reason) {
-                console.log("Strategy deposit failed with bytes");
-            }
+            console.log("Aave strategy direct deposit wrapper has been refactored and is no longer callable from this demo script.");
 
             uint256 afterAsset = IERC20(aaveAsset).balanceOf(hookLike);
             uint256 afterAToken = IERC20(aToken).balanceOf(hookLike);
@@ -184,13 +178,7 @@ contract DemoTokenMovementScript is Script {
                 vaultAmount
             );
 
-            try erc4626Strategy.deposit(ctx) returns (uint256 result) {
-                console.log("Strategy deposit succeeded, got", result, "shares");
-            } catch Error(string memory reason) {
-                console.log("Strategy deposit failed:", reason);
-            } catch (bytes memory reason) {
-                console.log("Strategy deposit failed with bytes");
-            }
+            console.log("ERC4626 strategy direct deposit wrapper has been refactored and is no longer callable from this demo script.");
 
             uint256 afterAsset = IERC20(vaultAsset).balanceOf(hookLike);
             uint256 afterShares = IERC4626(vault).balanceOf(hookLike);

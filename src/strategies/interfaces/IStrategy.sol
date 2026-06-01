@@ -22,15 +22,15 @@ interface IERC4626Strategy {
 }
 
 interface IStrategyCommon {
-    /// @notice Generic deposit entrypoint. `ctx` is strategy-specific encoded parameters.
-    function deposit(bytes calldata ctx) external returns (uint256);
+    /// @notice Prepare a deposit call from the Hook.
+    function prepareDeposit(address hook, bytes calldata ctx) external view returns (address target, bytes memory data);
 
-    /// @notice Generic withdraw entrypoint. Returns withdrawn underlying when available.
-    function withdraw(bytes calldata ctx) external returns (uint256);
+    /// @notice Prepare a withdraw call from the Hook.
+    function prepareWithdraw(address hook, bytes calldata ctx) external view returns (address target, bytes memory data);
 
-    /// @notice Return current protocol-specific balance for this contract (e.g. aToken.balanceOf or vault.balanceOf)
-    function balanceOf(bytes calldata ctx) external view returns (uint256);
+    /// @notice Return current protocol-specific balance for the hook address.
+    function balanceOf(address hook, bytes calldata ctx) external view returns (uint256);
 
     /// @notice For ERC4626-like strategies: convert `shares` to underlying assets. For other strategies may return the input.
-    function convertToAssets(bytes calldata ctx) external view returns (uint256);
+    function convertToAssets(address hook, bytes calldata ctx) external view returns (uint256);
 }

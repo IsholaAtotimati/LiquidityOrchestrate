@@ -4,10 +4,11 @@ pragma solidity ^0.8.26;
 import "forge-std/Test.sol";
 import "./Mocks.sol";
 import "../src/strategies/StrategyExecutor.sol";
+import {AaveStrategy} from "../src/strategies/aave/AaveStrategy.sol";
 import "../src/managers/StrategyManager.sol";
 import "../src/hooks/IdleLiquidityHookEnterprise.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {Status} from "../src/types/IdleLiquidityTypes.sol";
+import {Status, Strategy} from "../src/types/IdleLiquidityTypes.sol";
 
 contract DepositWithdrawTest is Test {
     MockERC20 asset;
@@ -34,6 +35,11 @@ contract DepositWithdrawTest is Test {
         executor = new StrategyExecutor();
         manager = new StrategyManager(address(this));
         manager.setExecutor(address(executor));
+
+        // deploy and register the real AaveStrategy implementation
+        AaveStrategy aaveStrategy = new AaveStrategy();
+        manager.setImplementation(Strategy.AAVE, address(aaveStrategy));
+        hook.setAaveStrategy(address(aaveStrategy));
 
         // set strategy manager in hook (owner-only)
         hook.setStrategyManager(address(manager));

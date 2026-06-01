@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {IdleLiquidityHookEnterprise} from "../src/hooks/IdleLiquidityHookEnterprise.sol";
+import {TestableIdleLiquidityHookEnterprise} from "./TestableIdleLiquidityHookEnterprise.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Status} from "../src/types/IdleLiquidityTypes.sol";
 import {ERC20PresetMinterPauser} from "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
@@ -37,13 +38,13 @@ contract MockAavePool {
 contract ReenterTest is Test {
     event ReenterReady(PoolId indexed pid, address indexed lp);
 
-    IdleLiquidityHookEnterprise hook;
+    TestableIdleLiquidityHookEnterprise hook;
     MockPoolManagerForReenter pm;
     address ownerAddr;
 
     function setUp() public {
         pm = new MockPoolManagerForReenter();
-        hook = new IdleLiquidityHookEnterprise(address(pm));
+        hook = new TestableIdleLiquidityHookEnterprise(address(pm));
         pm.setHook(address(hook));
         ownerAddr = address(this);
     }
