@@ -1,132 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>YieldPilot Demo Dashboard</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Liquidity Protocol</title>
 
-<link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 
-<!-- Charts -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Ethers.js -->
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.10.0/dist/ethers.umd.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
 </head>
+
 <body>
 
-<header>🚀 YieldPilot — Liquidity Orchestration Dashboard</header>
-
-<!-- ===================== -->
-<!-- 🔗 TOP BAR -->
-<!-- ===================== -->
-<div class="top-bar">
-    <div>
-        <button onclick="connectWallet()">Connect Wallet</button>
-        <p id="wallet">Not connected</p>
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <span>Liquidity orchestrate</span>
     </div>
 
-    <div>
-        <button class="secondary" onclick="runRebalance()">Run Rebalance</button>
+    <div class="topbar-right">
+      <div class="badge-live">LIVE SIMULATION</div>
+      <button id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
     </div>
-</div>
+  </header>
 
-<!-- ===================== -->
-<!-- 📊 MAIN DASHBOARD -->
-<!-- ===================== -->
-<div class="container">
+  <!-- MAIN GRID -->
+  <main class="container">
 
-    <!-- ===================== -->
-    <!-- 💰 CAPITAL OVERVIEW -->
-    <!-- ===================== -->
-    <div class="card">
-        <h3>Capital Overview</h3>
+    <!-- CARDS ROW -->
+    <section class="grid">
 
-        <p>Total: <span id="total">$0</span></p>
-        <p class="green">Active: <span id="active">$0</span></p>
-        <p class="yellow">Idle: <span id="idle">$0</span></p>
+      <div class="card">
+        <h3>LP Position</h3>
 
-        <hr/>
+        <div class="row">
+          <span>Liquidity</span>
+          <strong>1000 USDC / 1000 ETH</strong>
+        </div>
 
-        <p>LP Count: <span id="lpCount">0</span></p>
+        <div class="row">
+          <span>Range</span>
+          <strong>-120 → +120</strong>
+        </div>
 
-        <p>Your Liquidity0: <span id="liq0">0</span></p>
-        <p>Your Liquidity1: <span id="liq1">0</span></p>
+        <div class="status" id="lpStatus">ACTIVE</div>
+      </div>
 
-        <p>Your Yield0: <span id="yield0">0</span></p>
-        <p>Your Yield1: <span id="yield1">0</span></p>
-    </div>
+      <div class="card">
+        <h3>Market State</h3>
 
+        <div class="metric">
+          <span>Tick</span>
+          <strong id="tick">50</strong>
+        </div>
 
-    <!-- ===================== -->
-    <!-- 📊 YIELD COMPARISON -->
-    <!-- ===================== -->
-    <div class="card">
-        <h3>Yield Comparison</h3>
-        <canvas id="yieldChart"></canvas>
-    </div>
+        <div class="metric">
+          <span>Price</span>
+          <strong>$2,431</strong>
+        </div>
 
+        <div class="pill">Normal Volatility</div>
+      </div>
 
-    <!-- ===================== -->
-    <!-- 🔄 FLOW ENGINE -->
-    <!-- ===================== -->
-    <div class="card">
-        <h3>Liquidity Flow Engine</h3>
-        <p id="flowState">Waiting for swap event...</p>
-        <button onclick="triggerSwap()">Trigger Swap</button>
-    </div>
+      <div class="card">
+        <h3>Yield Engine</h3>
 
+        <div class="metric">
+          <span>Strategy</span>
+          <strong>Aave</strong>
+        </div>
 
-    <!-- ===================== -->
-    <!-- 📈 ROI SIMULATOR -->
-    <!-- ===================== -->
-    <div class="card">
-        <h3>ROI Simulator</h3>
-        <p>Adjust LP capital:</p>
-        <input type="range" min="10000" max="200000" value="120000" id="roiSlider" />
-        <p id="roiOutput">Estimated Yield: 9.8%</p>
-    </div>
+        <div class="metric">
+          <span>Yield</span>
+          <strong id="yield">0.00 USDC</strong>
+        </div>
 
+        <div class="pill green">Earning</div>
+      </div>
 
-    <!-- ===================== -->
-    <!-- 📈 TVL CHART -->
-    <!-- ===================== -->
-    <div class="card">
-        <h3>TVL Growth</h3>
-        <canvas id="tvlChart"></canvas>
-    </div>
+    </section>
 
+    <!-- EVENT STREAM -->
+    <section class="events">
+      <div class="events-header">
+        <h3>Live Protocol Events</h3>
+        <button id="streamToggle" class="stream-toggle" type="button" onclick="toggleEventStream()">Start live feed</button>
+      </div>
 
-    <!-- ===================== -->
-    <!-- 🥧 ALLOCATION -->
-    <!-- ===================== -->
-    <div class="card">
-        <h3>Strategy Allocation</h3>
-        <canvas id="allocationChart"></canvas>
-    </div>
+      <div id="feed" class="feed"></div>
+    </section>
 
+    <!-- ACTIONS -->
+    <section class="actions">
+      <button onclick="addLiquidity()">Add Liquidity</button>
+      <button onclick="simulateSwap()">Simulate Swap</button>
+      <button class="danger" onclick="rebalance()">Rebalance</button>
+    </section>
 
-    <!-- ===================== -->
-    <!-- 📊 YIELD TREND -->
-    <!-- ===================== -->
-    <div class="card">
-        <h3>Yield Accumulation</h3>
-        <canvas id="yieldTrendChart"></canvas>
-    </div>
+  </main>
 
-
-    <!-- ===================== -->
-    <!-- 📡 EVENT LOG -->
-    <!-- ===================== -->
-    <div class="card log">
-        <h3>Live Event Feed</h3>
-        <div id="log"></div>
-    </div>
-
-</div>
-
-<script src="app.js"></script>
-
+  <script src="app.js"></script>
 </body>
 </html>

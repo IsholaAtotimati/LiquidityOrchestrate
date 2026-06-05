@@ -1,0 +1,24 @@
+{
+  "name": "idle-liquidity-ui",
+  "version": "1.0.0",
+  "description": "YieldPilot - Idle Liquidity Hook Enterprise UI Dashboard",
+  "main": "app.js",
+  "scripts": {
+    "dev": "python3 -m http.server ${PORT:-8000}",
+    "start": "python3 -m http.server ${PORT:-8000}",
+    "serve": "python3 -m http.server ${PORT:-8000}",
+    "dev:8001": "PORT=8001 npm run dev",
+    "build": "echo 'Static UI - no build needed'",
+    "test": "echo 'No tests configured'"
+  },
+  "keywords": [
+    "uniswap",
+    "hook",
+    "idle-liquidity",
+    "yield",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {}
+}

@@ -1,196 +1,159 @@
-//
-// =======================
-// 📊 CHART
-// =======================
-const ctx = document.getElementById('yieldChart');
+let provider;
+let signer;
+let userAddress;
 
-const yieldChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: ['Without YieldPilot', 'With YieldPilot'],
-        datasets: [{
-            label: 'APY %',
-            data: [5.2, 9.8]
-        }]
-    },
-    options: {
-        responsive: true
-    }
-});
+let tick = 50;
+let yieldAmount = 0;
+let eventStreamTimer = null;
+let eventStreamEnabled = false;
 
+const feed = document.getElementById("feed");
+const tickEl = document.getElementById("tick");
+const yieldEl = document.getElementById("yield");
+const lpStatus = document.getElementById("lpStatus");
+const streamToggleBtn = document.getElementById("streamToggle");
 
-// =======================
-// 📡 EVENT LOG
-// =======================
-function log(msg) {
-    const logBox = document.getElementById("log");
-    const time = new Date().toLocaleTimeString();
-
-    logBox.innerHTML += `[${time}] ${msg}<br>`;
-    logBox.scrollTop = logBox.scrollHeight;
+/* -------------------------
+   EVENT STREAM UI
+--------------------------*/
+function addEvent(text) {
+  const div = document.createElement("div");
+  div.className = "event";
+  div.innerText = "› " + text;
+  feed.prepend(div);
 }
 
+function updateStreamToggleLabel() {
+  if (!streamToggleBtn) return;
 
-// =======================
-// 🔗 STATE
-// =======================
-let provider, signer, userAddress;
+  streamToggleBtn.textContent = eventStreamEnabled
+    ? "Pause live feed"
+    : "Start live feed";
+}
 
-
-// =======================
-// 🔗 WALLET CONNECTION
-// =======================
+/* -------------------------
+   WALLET CONNECT (REAL)
+--------------------------*/
 async function connectWallet() {
-    try {
-        // =======================
-        // 🧠 META MASK CHECK (FIXED)
-        // =======================
-        if (!window.ethereum || !window.ethereum.isMetaMask) {
-            alert("MetaMask not detected. Please open in Chrome/Brave with MetaMask installed.");
-            log("MetaMask not available");
-            return;
-        }
+  if (location.protocol === "file:") {
+    alert("Open this app from a local web server such as http://127.0.0.1:8000/ instead of file://. Wallet providers require an HTTP origin.");
+    return;
+  }
 
-        // =======================
-        // 🔗 PROVIDER INIT
-        // =======================
-        provider = new ethers.BrowserProvider(window.ethereum);
+  if (!window.ethereum) {
+    alert("MetaMask was not detected in this browser. Please open this app in Chrome or Edge with the MetaMask extension installed and enabled, then try again.");
+    return;
+  }
 
-        // =======================
-        // 📡 REQUEST ACCOUNTS
-        // =======================
-        const accounts = await provider.send("eth_requestAccounts", []);
+  provider = new ethers.BrowserProvider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
 
-        if (!accounts || accounts.length === 0) {
-            log("No wallet account returned");
-            return;
-        }
+  signer = await provider.getSigner();
+  userAddress = await signer.getAddress();
 
-        // =======================
-        // 🔐 SIGNER
-        // =======================
-        signer = await provider.getSigner();
-        userAddress = await signer.getAddress();
+  document.getElementById("walletBtn").innerText =
+    userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
 
-        // =======================
-        // 🎯 UI UPDATE
-        // =======================
-        document.getElementById("wallet").innerText = userAddress;
+  addEvent("Wallet connected: " + userAddress);
+  addEvent("Live feed is ready — press Start live feed when you want protocol updates.");
+}
 
-        log("Wallet connected: " + userAddress);
+/* -------------------------
+   FAKE LIVE STREAM
+--------------------------*/
+function startEventStream() {
+  if (eventStreamTimer) return;
 
-        // =======================
-        // 🔄 AUTO REFRESH DASHBOARD
-        // =======================
-        if (typeof updateDashboard === "function") {
-            updateDashboard();
-        }
+  eventStreamEnabled = true;
+  updateStreamToggleLabel();
 
-    } catch (err) {
-        console.error(err);
-
-        // Better error visibility
-        if (err.code === 4001) {
-            log("User rejected wallet connection");
-        } else {
-            log("Wallet connection failed: " + err.message);
-        }
+  addEvent("Connecting to PoolManager stream...");
+  setTimeout(() => {
+    if (eventStreamEnabled) {
+      addEvent("Event stream active");
     }
-}
+  }, 800);
 
-// =======================
-// 🔁 REBALANCE (REAL TX)
-// =======================
-async function runRebalance(event) {
-    try {
-        if (!signer) {
-            alert("Connect wallet first");
-            return;
-        }
+  eventStreamTimer = setInterval(() => {
+    const events = [
+      "Swap executed",
+      "Tick updated",
+      "LiquidityIdle detected",
+      "Rebalance triggered",
+      "Yield index updated"
+    ];
 
-        const button = event?.target || document.querySelector(".secondary");
+    const e = events[Math.floor(Math.random() * events.length)];
+    addEvent(e);
 
-        button.innerText = "Rebalancing...";
-        button.disabled = true;
-
-        log("Sending rebalance transaction...");
-
-        const contract = getContract();
-
-        const pid = "0xPOOL_ID"; // ⚠️ replace with real PoolId
-
-        const tx = await contract.rebalance(pid, 0, 10);
-
-        log("TX sent: " + tx.hash);
-
-        await tx.wait();
-
-        log("Rebalance confirmed on-chain");
-
-    } catch (err) {
-        console.error(err);
-        log("Rebalance failed");
-
-    } finally {
-        const button = document.querySelector(".secondary");
-        button.innerText = "Run Rebalance";
-        button.disabled = false;
+    if (e.includes("LiquidityIdle")) {
+      lpStatus.innerText = "IDLE";
     }
-}
 
-
-// =======================
-// 🔁 SWAP SIMULATION
-// =======================
-function triggerSwap() {
-    document.getElementById("flowState").innerText =
-        "Swap detected in Uniswap pool";
-
-    log("Swap detected");
-
-    setTimeout(() => log("Idle liquidity marked"), 800);
-    setTimeout(() => log("$12,400 moved to Aave"), 1600);
-    setTimeout(() => log("Rebalance complete"), 2400);
-}
-
-
-// =======================
-// 📈 ROI SIMULATOR
-// =======================
-const slider = document.getElementById("roiSlider");
-const output = document.getElementById("roiOutput");
-
-if (slider && output) {
-    slider.oninput = function () {
-        const base = 5.2;
-        const boosted = 9.8;
-
-        const ratio =
-            (this.value - 10000) / (200000 - 10000);
-
-        const estimate = base + (boosted - base) * ratio;
-
-        output.innerText = `Estimated Yield: ${estimate.toFixed(2)}%`;
-
-        log("ROI recalculated");
-    };
-}
-
-
-// =======================
-// 📊 DASHBOARD HOOK (FOR NEXT STEP)
-// =======================
-async function updateDashboard() {
-    try {
-        // placeholder for future on-chain sync
-        // will connect:
-        // - LP count
-        // - TVL
-        // - user positions
-
-        log("Dashboard sync (placeholder)");
-
-    } catch (err) {
-        console.error(err);
+    if (e.includes("Tick")) {
+      tick += Math.floor(Math.random() * 20 - 10);
+      tickEl.innerText = tick;
     }
+
+    if (e.includes("Yield")) {
+      yieldAmount += 0.5;
+      yieldEl.innerText = yieldAmount.toFixed(2) + " USDC";
+    }
+  }, 2500);
+}
+
+function stopEventStream() {
+  if (!eventStreamTimer) return;
+
+  clearInterval(eventStreamTimer);
+  eventStreamTimer = null;
+  eventStreamEnabled = false;
+  updateStreamToggleLabel();
+  addEvent("Live feed paused by user");
+}
+
+function toggleEventStream() {
+  if (eventStreamEnabled) {
+    stopEventStream();
+    return;
+  }
+
+  startEventStream();
+}
+
+/* -------------------------
+   DEMO ACTIONS
+--------------------------*/
+function addLiquidity() {
+  lpStatus.innerText = "ACTIVE";
+  addEvent("Liquidity added");
+}
+
+function simulateSwap() {
+  tick = 250;
+  tickEl.innerText = tick;
+
+  addEvent("Swap detected");
+  setTimeout(() => {
+    lpStatus.innerText = "IDLE";
+    addEvent("Liquidity became idle");
+  }, 600);
+}
+
+function rebalance() {
+  addEvent("Rebalance initiated");
+
+  setTimeout(() => {
+    addEvent("Depositing into Aave");
+  }, 700);
+
+  let i = setInterval(() => {
+    yieldAmount += 0.6;
+    yieldEl.innerText = yieldAmount.toFixed(2) + " USDC";
+
+    if (yieldAmount > 6) {
+      clearInterval(i);
+      addEvent("Yield accruing from protocol");
+    }
+  }, 400);
 }

@@ -1,4 +1,5 @@
-let contractAddress = "0xaf911bdc75f8644fc7ed653b2d493383657c4040";
+let contractAddress = "0xd4fdac8f12277a76da35d293acb8495c3ee029e3";
+let contractPoolId = "0x09680032ab300a9ad3c27cfb475468b1dbf569c0c54d0c3ba8b0fdaf8e12b388";
 
 (async function loadAddresses(){
   try{
@@ -8,12 +9,16 @@ let contractAddress = "0xaf911bdc75f8644fc7ed653b2d493383657c4040";
     if(data.hook) contractAddress = data.hook;
     else if(data.IdleLiquidityHookEnterprise) contractAddress = data.IdleLiquidityHookEnterprise;
     else if(data.hookAddress) contractAddress = data.hookAddress;
+
+    if(data.poolId) contractPoolId = data.poolId;
+    else if(data.pid) contractPoolId = data.pid;
+    else if(data.poolID) contractPoolId = data.poolID;
   }catch(e){
     console.warn('Could not load addresses.json:', e);
   }
 })();
 
-const abi = [
+let abi = [
   {
     "type": "constructor",
     "inputs": [
@@ -2153,3 +2158,20 @@ const abi = [
     "inputs": []
   }
 ];
+
+(async function overrideABI(){
+  try{
+    const res = await fetch('../artifacts/IdleLiquidityHookEnterprise.sol/IdleLiquidityHookEnterprise.json');
+    if(!res.ok){
+      console.warn('Could not fetch artifact ABI:', res.status);
+      return;
+    }
+    const json = await res.json();
+    if(json && json.abi && Array.isArray(json.abi)){
+      abi = json.abi;
+      console.info('Contract ABI overridden from artifact');
+    }
+  }catch(e){
+    console.warn('Error loading ABI artifact:', e);
+  }
+})();
