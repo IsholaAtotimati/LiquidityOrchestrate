@@ -4,6 +4,7 @@ pragma solidity ^0.8.15;
 import "forge-std/Script.sol";
 import {AaveStrategy} from "../src/strategies/aave/AaveStrategy.sol";
 import {IdleLiquidityHookEnterprise} from "../src/hooks/IdleLiquidityHookEnterprise.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Create2Deployer} from "../src/utils/Create2Deployer.sol";
 
 contract DeployScript is Script {
@@ -31,18 +32,18 @@ contract DeployScript is Script {
 
         // Prepare Hook bytecode (include constructor arg) and salt
         bytes memory hookCode = abi.encodePacked(type(IdleLiquidityHookEnterprise).creationCode, abi.encode(poolManager));
-        bytes32 saltHook = keccak256(abi.encodePacked("HOOK_SALT_V1"));
+        bytes32 hookSalt = keccak256(abi.encodePacked("HOOK_SALT_V1"));
         bytes32 hookHash = keccak256(hookCode);
-        address predictedHook = factory.computeAddress(saltHook, hookHash, address(factory));
+        address predictedHook = factory.computeAddress(hookSalt, hookHash, address(factory));
         console.log("predicted Hook:", predictedHook);
 
-        factory.deploy(hookCode, saltHook);
+        factory.deploy(hookCode, hookSalt);
+        IdleLiquidityHookEnterprise hook = IdleLiquidityHookEnterprise(predictedHook);
         address hookAddr = predictedHook;
         console.log("deployed Hook:", hookAddr);
 
-        // Wire up Aave strategy address on the hook. The hook owner is the Create2 factory,
-        // so the factory must perform this call.
-        factory.call(hookAddr, abi.encodeWithSelector(IdleLiquidityHookEnterprise.setAaveStrategy.selector, aaveAddr));
+        // Wire up Aave strategy address on the hook directly from the deployer owner.
+        hook.setAaveStrategy(aaveAddr);
         console.log("setAaveStrategy ->", aaveAddr);
 
         vm.stopBroadcast();

@@ -183,6 +183,23 @@ contract IdleLiquidityHookEnterpriseTest is Test{
         hook.rebalance(pid, 0, 1);
     }
 
+    function testNeedUpdateIsOpenToAnyCaller() public {
+        PoolId pid = PoolId.wrap(bytes32(uint256(7)));
+
+        vm.prank(owner);
+        hook.setApprovedPool(pid, true);
+
+        address user = address(0xBEEF);
+        vm.prank(user);
+        bool ok = hook.needUpdate(pid);
+
+        assertTrue(ok, "needUpdate should return true");
+
+        (bool upkeepNeeded, bytes memory performData) = hook.checkUpkeep("");
+        assertTrue(upkeepNeeded, "checkUpkeep should detect the requested update");
+        assertGt(performData.length, uint256(0), "performData should be returned");
+    }
+
     function testFullFlow_Pool_Liquidity_Swap_Hook_Rebalance() public {
         // Wrap the full flow in an external helper and `try` it so unit tests remain robust
         try this.runFullFlowHelper() {

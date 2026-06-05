@@ -38,7 +38,6 @@ contract IdleLiquidityHookEnterprise is BaseHook, IdleLiquidityRebalanceEngine {
     event LiquidityIdle(PoolId indexed pid, address indexed lp);
     event EmergencyPauseSet(bool paused);
     event PositionRegistered(PoolId indexed pid, address indexed lp, address caller, uint128 liquidity0, uint128 liquidity1, int24 lower, int24 upper);
-    event ConstructorDebug(address inputPoolManager, address actualPoolManager);
     event UpdateRequested(PoolId indexed pid, uint256 lastUpdateRequestBlock, uint256 currentBlock, uint256 minInterval, bool set);
 
     uint256 public constant DEFAULT_REBALANCE_COOLDOWN_BLOCKS = 20;
@@ -60,7 +59,6 @@ contract IdleLiquidityHookEnterprise is BaseHook, IdleLiquidityRebalanceEngine {
         s.maxLPsPerPool = 2000;
         s.rebalanceCooldownBlocks = DEFAULT_REBALANCE_COOLDOWN_BLOCKS;
         s.rebalanceTickThreshold = DEFAULT_REBALANCE_TICK_THRESHOLD;
-        emit ConstructorDebug(_pm, address(poolManager));
     }
 
     // =========================
@@ -197,11 +195,24 @@ contract IdleLiquidityHookEnterprise is BaseHook, IdleLiquidityRebalanceEngine {
         s.maxLPsPerPool = v;
     }
 
-    function needUpdate(PoolId pid) external onlyOwner returns (bool) {
+    function needUpdate(PoolId pid) external returns (bool) {
         IdleLiquidityStorage.Layout storage s = _state();
         s._needUpdate[pid] = true;
         s.lastUpdateRequestBlock[pid] = block.number;
+
+        if (!s.poolExists[pid] && s.approvedPools[pid]) {
+            s.allPools.push(pid);
+            s.poolExists[pid] = true;
+            if (s.poolCursor >= s.allPools.length) {
+                s.poolCursor = 0;
+            }
+        }
+
         return true;
+    }
+
+    function approvedPools(PoolId pid) external view returns (bool) {
+        return _state().approvedPools[pid];
     }
 
     function registerPosition(
@@ -243,6 +254,11 @@ contract IdleLiquidityHookEnterprise is BaseHook, IdleLiquidityRebalanceEngine {
         return s.trackedLPs[pid];
     }
 
+    function totalIdleLiquidity(PoolId pid, uint8 side) external view returns (uint256) {
+        IdleLiquidityStorage.Layout storage s = _state();
+        return s.totalIdleLiquidity[pid][side];
+    }
+
     function totalATokenPrincipal(PoolId pid, uint8 side) external view returns (uint256) {
         return _state().totalATokenPrincipal[pid][side];
     }
@@ -251,8 +267,16 @@ contract IdleLiquidityHookEnterprise is BaseHook, IdleLiquidityRebalanceEngine {
         return _state().totalVaultShares[pid][side];
     }
 
-    function totalIdleLiquidity(PoolId pid, uint8 side) external view returns (uint256) {
-        return _state().totalIdleLiquidity[pid][side];
+    function globalYieldIndex(PoolId pid, uint8 side) external view returns (uint256) {
+        return _state().globalYieldIndex[pid][side];
+    }
+
+    function lastRebalanceBlock(PoolId pid) external view returns (uint256) {
+        return _state().lastRebalanceBlock[pid];
+    }
+
+    function failureCount(address account) external view returns (uint256) {
+        return _state().failureCount[account];
     }
 
     function positions(PoolId pid, address lp)
@@ -290,22 +314,6 @@ contract IdleLiquidityHookEnterprise is BaseHook, IdleLiquidityRebalanceEngine {
             pos.aTokenPrincipal0,
             pos.aTokenPrincipal1
         );
-    }
-
-    function approvedPools(PoolId pid) external view returns (bool) {
-        return _state().approvedPools[pid];
-    }
-
-    function failureCount(address target) external view returns (uint256) {
-        return _state().failureCount[target];
-    }
-
-    function lastRebalanceBlock(PoolId pid) external view returns (uint256) {
-        return _state().lastRebalanceBlock[pid];
-    }
-
-    function globalYieldIndex(PoolId pid, uint8 side) external view returns (uint256) {
-        return _state().globalYieldIndex[pid][side];
     }
 
     function setRebalanceCooldownBlocks(uint256 blocks) external onlyOwner {

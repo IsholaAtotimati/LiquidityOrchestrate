@@ -31,3 +31,5 @@ remappings = [
 optimizer = true
 optimizer_runs = 200
 via_ir = true
+[etherscan]
+1301 = { key = "${ETHERSCAN_API_KEY}", url = "https://sepolia.uniscan.xyz/api" }
